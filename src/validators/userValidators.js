@@ -41,6 +41,23 @@ export const updateContractorSchema = z
     message: "Provide at least one field to update",
   });
 
+export const createSupervisorSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  mobile,
+  email,
+  password: optionalPassword,
+});
+
+export const updateSupervisorSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    mobile: mobile.optional(),
+    email,
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "Provide at least one field to update",
+  });
+
 export const resetPasswordSchema = z.object({
   password: optionalPassword,
 });

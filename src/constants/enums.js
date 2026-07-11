@@ -5,6 +5,7 @@ export const ROLES = {
   SUPER_ADMIN: "SUPER_ADMIN",
   MANAGER: "MANAGER",
   CONTRACTOR: "CONTRACTOR",
+  SUPERVISOR: "SUPERVISOR",
 };
 
 export const USER_STATUS = {
@@ -35,5 +36,6 @@ export const DOC_CATEGORY = [
 ];
 export const DOC_PARENT_TYPES = ["Project", "WorkOrder", "Contractor", "Labour"];
 export const COMMENT_PARENT_TYPES = ["WorkOrder", "Project"];
-export const MATERIAL_TYPE = ["Received", "Issued"];
+export const MATERIAL_TYPE = ["Received", "Used", "Issued"];
+export const MATERIAL_RECEIPT_STATUS = ["Pending", "Confirmed", "Issue"];
 export const LABOUR_TASK_STATUS = ["Not Started", "In Progress", "Completed"];

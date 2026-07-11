@@ -17,6 +17,7 @@ const fields = {
   targetDate: z.coerce.date().optional(),
   status: enumOf(PROJECT_STATUS).optional(),
   manager: z.string().optional(), // required for Super Admin; resolved in controller
+  supervisor: z.string().nullable().optional(), // site material custodian; "" / null clears
   image: z.string().optional(),
 };
 

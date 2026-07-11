@@ -7,6 +7,29 @@ import { Project } from "../models/Project.js";
 import { ROLES } from "../constants/enums.js";
 import { visibleProjectIds } from "../services/access.js";
 
+// Which role may record each movement type:
+//   Used              → Supervisor (site custodian) or Super Admin
+//   Received / Issued  → Manager or Super Admin
+function assertCanRecord(role, type) {
+  if (type === "Used") {
+    if (role !== ROLES.SUPER_ADMIN && role !== ROLES.SUPERVISOR) {
+      throw ApiError.forbidden("Only the site supervisor logs material usage");
+    }
+  } else if (role !== ROLES.SUPER_ADMIN && role !== ROLES.MANAGER) {
+    throw ApiError.forbidden("Only a manager records material deliveries");
+  }
+}
+
+// The current user must be scoped to the project for their role.
+function assertProjectScope(user, project) {
+  if (user.role === ROLES.MANAGER && !project.manager.equals(user._id)) {
+    throw ApiError.forbidden("You can only record materials for your own projects");
+  }
+  if (user.role === ROLES.SUPERVISOR && !project.supervisor?.equals(user._id)) {
+    throw ApiError.forbidden("You can only manage materials for sites you supervise");
+  }
+}
+
 export const createMaterial = asyncHandler(async (req, res) => {
   const b = req.body;
   if (!mongoose.isValidObjectId(b.project)) {
@@ -14,9 +37,10 @@ export const createMaterial = asyncHandler(async (req, res) => {
   }
   const project = await Project.findById(b.project);
   if (!project) throw ApiError.badRequest("Project not found");
-  if (req.user.role === ROLES.MANAGER && !project.manager.equals(req.user._id)) {
-    throw ApiError.forbidden("You can only record materials for your own projects");
-  }
+
+  assertCanRecord(req.user.role, b.type);
+  assertProjectScope(req.user, project);
+
   let contractor = null;
   if (b.contractor) {
     if (!mongoose.isValidObjectId(b.contractor)) {
@@ -35,10 +59,35 @@ export const createMaterial = asyncHandler(async (req, res) => {
     party: b.party ?? null,
     contractor,
     note: b.note ?? null,
+    // A delivery is pending until the supervisor confirms it.
+    receiptStatus: b.type === "Received" ? "Pending" : null,
     createdBy: req.user._id,
   });
   await material.populate("project", "name code");
   sendCreated(res, material);
+});
+
+// POST /materials/:id/confirm — the supervisor confirms a delivery or flags an issue.
+export const confirmMaterial = asyncHandler(async (req, res) => {
+  const material = await Material.findById(req.params.id);
+  if (!material) throw ApiError.notFound("Material entry not found");
+  if (material.type !== "Received") {
+    throw ApiError.badRequest("Only received deliveries can be confirmed");
+  }
+  const project = await Project.findById(material.project);
+  if (!project) throw ApiError.notFound("Project not found");
+  assertProjectScope(req.user, project);
+
+  material.receiptStatus = req.body.status; // "Confirmed" | "Issue"
+  material.confirmedBy = req.user._id;
+  material.confirmedAt = new Date();
+  material.receiptNote = req.body.note ?? null;
+  await material.save();
+  await material.populate([
+    { path: "project", select: "name code" },
+    { path: "confirmedBy", select: "name role" },
+  ]);
+  sendSuccess(res, material);
 });
 
 export const listMaterials = asyncHandler(async (req, res) => {
@@ -49,6 +98,7 @@ export const listMaterials = asyncHandler(async (req, res) => {
     ands.push({ project: req.query.project });
   }
   if (req.query.type) ands.push({ type: req.query.type });
+  if (req.query.receiptStatus) ands.push({ receiptStatus: req.query.receiptStatus });
   if (req.query.from || req.query.to) {
     const range = {};
     if (req.query.from) range.$gte = new Date(req.query.from);
@@ -58,6 +108,7 @@ export const listMaterials = asyncHandler(async (req, res) => {
   const filter = ands.length ? { $and: ands } : {};
   const materials = await Material.find(filter)
     .populate("project", "name code")
+    .populate("confirmedBy", "name role")
     .sort({ date: -1 });
   sendSuccess(res, materials);
 });

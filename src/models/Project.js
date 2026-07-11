@@ -19,11 +19,18 @@ const projectSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
+  // Site-level material custodian (role SUPERVISOR). Optional; one per project.
+  supervisor: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null,
+  },
   image: { type: String, default: null },
 });
 
 baseSchema(projectSchema);
 projectSchema.index({ manager: 1 });
+projectSchema.index({ supervisor: 1 });
 projectSchema.index({ status: 1 });
 
 // `progress` is computed from work orders (see services/rollups.js), not stored.

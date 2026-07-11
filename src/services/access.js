@@ -12,6 +12,34 @@ export async function managerProjectIds(managerId) {
   return projects.map((p) => p._id);
 }
 
+/** Project _ids where the given user is the assigned supervisor. */
+export async function supervisorProjectIds(supervisorId) {
+  const projects = await Project.find({ supervisor: supervisorId }).select("_id");
+  return projects.map((p) => p._id);
+}
+
+/**
+ * Supervisor ids (as strings) a manager may view/edit (mirrors §7.2 for contractors):
+ *   - supervisors the manager created, OR
+ *   - supervisors assigned to a project the manager manages.
+ */
+export async function supervisorIdsVisibleToManager(managerId) {
+  const [created, projects] = await Promise.all([
+    User.find({ role: ROLES.SUPERVISOR, createdBy: managerId }).select("_id"),
+    Project.find({ manager: managerId }).select("supervisor"),
+  ]);
+  const ids = new Set(created.map((u) => u._id.toString()));
+  for (const p of projects) if (p.supervisor) ids.add(p.supervisor.toString());
+  return ids;
+}
+
+/** Manager-visible user ids for a given role (contractor / supervisor). */
+export async function userIdsVisibleToManager(managerId, role) {
+  if (role === ROLES.CONTRACTOR) return contractorIdsVisibleToManager(managerId);
+  if (role === ROLES.SUPERVISOR) return supervisorIdsVisibleToManager(managerId);
+  return new Set();
+}
+
 /**
  * Contractor ids (as strings) a manager may view/edit (PRD §7.2):
  *   - contractors the manager created, OR
@@ -38,6 +66,7 @@ export async function contractorIdsVisibleToManager(managerId) {
 export async function projectScopeFilter(user) {
   if (user.role === ROLES.SUPER_ADMIN) return {};
   if (user.role === ROLES.MANAGER) return { manager: user._id };
+  if (user.role === ROLES.SUPERVISOR) return { supervisor: user._id };
   // Contractor: projects where they have at least one work order.
   const wos = await WorkOrder.find({ contractor: user._id }).select("projectId");
   const ids = [...new Set(wos.map((w) => w.projectId.toString()))].map(oid);
@@ -82,6 +111,7 @@ export async function attendanceScopeFilter(user) {
 export async function visibleProjectIds(user) {
   if (user.role === ROLES.SUPER_ADMIN) return null;
   if (user.role === ROLES.MANAGER) return managerProjectIds(user._id);
+  if (user.role === ROLES.SUPERVISOR) return supervisorProjectIds(user._id);
   const wos = await WorkOrder.find({ contractor: user._id }).select("projectId");
   return [...new Set(wos.map((w) => w.projectId.toString()))].map(oid);
 }

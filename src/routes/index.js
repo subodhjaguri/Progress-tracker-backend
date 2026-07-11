@@ -3,6 +3,7 @@ import { sendSuccess } from "../utils/response.js";
 import authRoutes from "./authRoutes.js";
 import managerRoutes from "./managerRoutes.js";
 import contractorRoutes from "./contractorRoutes.js";
+import supervisorRoutes from "./supervisorRoutes.js";
 import userRoutes from "./userRoutes.js";
 import projectRoutes from "./projectRoutes.js";
 import workOrderRoutes from "./workOrderRoutes.js";
@@ -25,6 +26,7 @@ router.get("/health", (req, res) =>
 router.use("/auth", authRoutes);
 router.use("/managers", managerRoutes);
 router.use("/contractors", contractorRoutes);
+router.use("/supervisors", supervisorRoutes);
 router.use("/users", userRoutes);
 router.use("/projects", projectRoutes);
 router.use("/work-orders", workOrderRoutes);

@@ -7,6 +7,7 @@ import { User } from "../src/models/User.js";
 import { Project } from "../src/models/Project.js";
 import { WorkOrder } from "../src/models/WorkOrder.js";
 import { Labour } from "../src/models/Labour.js";
+import { Material } from "../src/models/Material.js";
 import { ROLES, USER_STATUS } from "../src/constants/enums.js";
 import { nextCode } from "../src/services/code.js";
 
@@ -66,6 +67,12 @@ async function ensureLabour({ name, contractor, skill, ...fields }) {
   return Labour.create({ name, contractor, skill, createdBy: contractor, ...fields });
 }
 
+async function ensureMaterial({ project, materialName, type, date, ...fields }) {
+  const existing = await Material.findOne({ project, materialName, type, date });
+  if (existing) return existing;
+  return Material.create({ project, materialName, type, date, ...fields });
+}
+
 async function run() {
   await connectDB();
 
@@ -111,6 +118,16 @@ async function run() {
   const salman = cons["9820000002"];
   const faizan = cons["9820000003"];
 
+  // 3b) Supervisor (site material custodian) — created by Priya
+  const rakesh = await ensureUser({
+    name: "Rakesh Verma",
+    mobile: "9830000001",
+    role: ROLES.SUPERVISOR,
+    password: DEMO_PASSWORD,
+    email: "rakesh@example.com",
+    createdBy: priya.user._id,
+  });
+
   // 4) Projects
   const riverside = await ensureProject({
     name: "Riverside Hotel",
@@ -155,20 +172,37 @@ async function run() {
   await ensureLabour({ name: "Imran Khan", contractor: salman._id, skill: "Welder" });
   await ensureLabour({ name: "Vijay Pal", contractor: faizan._id, skill: "Painter" });
 
+  // 7) Assign the supervisor to Priya's sites (idempotent)
+  for (const p of [riverside, greenfield]) {
+    if (!p.supervisor) {
+      p.supervisor = rakesh.user._id;
+      await p.save();
+    }
+  }
+
+  // 8) Material ledger for Riverside (custodian = Rakesh): a confirmed + a pending
+  //    delivery, plus two days of usage the owner can see.
+  await ensureMaterial({ project: riverside._id, materialName: "Cement", type: "Received", date: new Date("2026-07-08"), quantity: 100, unit: "bags", party: "UltraTech Supplier", receiptStatus: "Confirmed", confirmedBy: rakesh.user._id, confirmedAt: new Date("2026-07-08"), createdBy: priya.user._id });
+  await ensureMaterial({ project: riverside._id, materialName: "Steel", type: "Received", date: new Date("2026-07-10"), quantity: 5, unit: "MT", party: "SAIL Depot", receiptStatus: "Pending", createdBy: priya.user._id });
+  await ensureMaterial({ project: riverside._id, materialName: "Cement", type: "Used", date: new Date("2026-07-09"), quantity: 20, unit: "bags", createdBy: rakesh.user._id });
+  await ensureMaterial({ project: riverside._id, materialName: "Cement", type: "Used", date: new Date("2026-07-10"), quantity: 18, unit: "bags", createdBy: rakesh.user._id });
+
   // Summary
   const [projectCount, woCount, labourCount] = await Promise.all([
     Project.countDocuments({ isDeleted: { $ne: true } }),
     WorkOrder.countDocuments({ isDeleted: { $ne: true } }),
     Labour.countDocuments({ isDeleted: { $ne: true } }),
   ]);
+  const materialCount = await Material.countDocuments({ isDeleted: { $ne: true } });
   console.log("\n=== Demo data ===");
-  console.log("Accounts: 1 Super Admin + 2 Managers + 3 Contractors");
-  console.log(`Projects: ${projectCount} · Work orders: ${woCount} · Labour: ${labourCount}`);
+  console.log("Accounts: 1 Super Admin + 2 Managers + 3 Contractors + 1 Supervisor");
+  console.log(`Projects: ${projectCount} · Work orders: ${woCount} · Labour: ${labourCount} · Materials: ${materialCount}`);
   console.log("\nPasswords:");
   console.log(`  • Super Admin: ${process.env.SEED_SUPERADMIN_PASSWORD || DEMO_PASSWORD}`);
-  console.log(`  • Managers & Contractors: ${DEMO_PASSWORD}`);
+  console.log(`  • Managers, Contractors & Supervisor: ${DEMO_PASSWORD}`);
   console.log("  Logins: SA 9999999999 · Priya 9810000001 · Arjun 9810000002 ·");
-  console.log("          Vikram 9820000001 · Salman 9820000002 · Faizan 9820000003\n");
+  console.log("          Vikram 9820000001 · Salman 9820000002 · Faizan 9820000003 ·");
+  console.log("          Rakesh (supervisor) 9830000001\n");
 
   await mongoose.disconnect();
 }

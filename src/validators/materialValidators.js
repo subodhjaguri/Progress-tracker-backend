@@ -13,3 +13,8 @@ export const createMaterialSchema = z.object({
   contractor: z.string().optional(),
   note: z.string().optional(),
 });
+
+export const confirmMaterialSchema = z.object({
+  status: z.enum(["Confirmed", "Issue"]),
+  note: z.string().optional(),
+});

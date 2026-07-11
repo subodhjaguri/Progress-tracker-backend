@@ -11,3 +11,12 @@ export function dayRange(d) {
   end.setUTCDate(end.getUTCDate() + 1);
   return { start, end };
 }
+
+/** { start, end } covering the UTC calendar month of `d` (end exclusive). */
+export function monthRange(d) {
+  const dt = new Date(d);
+  const start = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), 1));
+  const end = new Date(start);
+  end.setUTCMonth(end.getUTCMonth() + 1);
+  return { start, end };
+}

@@ -8,9 +8,9 @@ import { Material } from "../models/Material.js";
 import { ProgressUpdate } from "../models/ProgressUpdate.js";
 import { Comment } from "../models/Comment.js";
 import { ROLES } from "../constants/enums.js";
-import { managerProjectIds } from "../services/access.js";
+import { managerProjectIds, supervisorProjectIds } from "../services/access.js";
 import { progressByProject, attendanceCounts } from "../services/rollups.js";
-import { dayRange } from "../utils/date.js";
+import { dayRange, monthRange } from "../utils/date.js";
 
 // countDocuments/aggregate bypass the soft-delete find hook, so filter explicitly.
 const ND = { isDeleted: { $ne: true } };
@@ -141,10 +141,47 @@ async function contractorDashboard(user) {
   };
 }
 
+async function supervisorDashboard(user) {
+  const { start, end } = dayRange(new Date());
+  const month = monthRange(new Date());
+  const projectIds = await supervisorProjectIds(user._id);
+  const matScope = { project: { $in: projectIds } };
+  const pendingFilter = { ...matScope, type: "Received", receiptStatus: "Pending" };
+  const usageFilter = { ...matScope, type: "Used", date: { $gte: start, $lt: end } };
+  // No data dependency between the counts and the lists, so run them all concurrently.
+  const [
+    pendingConfirmations,
+    deliveriesThisMonth,
+    usageLoggedToday,
+    pending,
+    recentActivity,
+    todaysUsage,
+  ] = await Promise.all([
+    Material.countDocuments({ ...ND, ...pendingFilter }),
+    Material.countDocuments({
+      ...ND,
+      ...matScope,
+      type: "Received",
+      date: { $gte: month.start, $lt: month.end },
+    }),
+    Material.countDocuments({ ...ND, ...usageFilter }),
+    Material.find(pendingFilter).populate("project", "name code").sort({ date: -1 }).limit(8),
+    Material.find(matScope).populate("project", "name code").sort({ date: -1 }).limit(8),
+    Material.find(usageFilter).populate("project", "name code").sort({ date: -1 }).limit(8),
+  ]);
+  return {
+    role: ROLES.SUPERVISOR,
+    cards: { mySites: projectIds.length, pendingConfirmations, deliveriesThisMonth, usageLoggedToday },
+    sections: { pendingConfirmations: pending, recentActivity, todaysUsage },
+  };
+}
+
 export const getDashboard = asyncHandler(async (req, res) => {
   let data;
   if (req.user.role === ROLES.SUPER_ADMIN) data = await superAdminDashboard();
   else if (req.user.role === ROLES.MANAGER) data = await managerDashboard(req.user);
+  else if (req.user.role === ROLES.SUPERVISOR)
+    data = await supervisorDashboard(req.user);
   else data = await contractorDashboard(req.user);
   sendSuccess(res, data);
 });

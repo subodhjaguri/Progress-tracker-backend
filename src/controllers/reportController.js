@@ -29,9 +29,11 @@ export const dailyReport = asyncHandler(async (req, res) => {
   for (const w of workOrders) byStatus[w.status] = (byStatus[w.status] || 0) + 1;
   const woIds = workOrders.map((w) => w._id);
 
-  const [attendance, materialsIssued, photos, remarks] = await Promise.all([
+  const [attendance, materials, photos, remarks] = await Promise.all([
     attendanceCounts({ project: projectId, date: { $gte: start, $lt: end } }),
-    Material.find({ project: projectId, type: "Issued", date: { $gte: start, $lt: end } }),
+    Material.find({ project: projectId, date: { $gte: start, $lt: end } })
+      .populate("confirmedBy", "name role")
+      .sort({ date: -1 }),
     Document.find({
       category: "Site Photo",
       createdAt: { $gte: start, $lt: end },
@@ -44,6 +46,9 @@ export const dailyReport = asyncHandler(async (req, res) => {
       .populate("author", "name role")
       .sort({ date: -1 }),
   ]);
+  const materialsReceived = materials.filter((m) => m.type === "Received");
+  const materialsUsed = materials.filter((m) => m.type === "Used");
+  const materialsIssued = materials.filter((m) => m.type === "Issued");
 
   sendSuccess(res, {
     project: {
@@ -57,6 +62,8 @@ export const dailyReport = asyncHandler(async (req, res) => {
     date: start,
     attendance,
     workOrders: { byStatus, total: workOrders.length, list: workOrders },
+    materialsReceived,
+    materialsUsed,
     materialsIssued,
     photos: { count: photos.length, list: photos },
     remarks,

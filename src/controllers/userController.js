@@ -4,7 +4,7 @@ import { sendSuccess, sendCreated } from "../utils/response.js";
 import { User } from "../models/User.js";
 import { ROLES } from "../constants/enums.js";
 import { generateTempPassword } from "../utils/password.js";
-import { contractorIdsVisibleToManager } from "../services/access.js";
+import { userIdsVisibleToManager } from "../services/access.js";
 
 async function createUserAccount({ role, body, creator }) {
   const generated = !body.password;
@@ -36,17 +36,25 @@ function ensureNotSuperAdmin(target) {
   }
 }
 
-async function loadContractorScoped(req) {
-  const contractor = await User.findOne({
-    _id: req.params.id,
-    role: ROLES.CONTRACTOR,
-  });
-  if (!contractor) throw ApiError.notFound("Contractor not found");
+// Load a contractor/supervisor by id, enforcing the manager "visible to me" scope.
+async function loadUserScoped(req, role, noun) {
+  const user = await User.findOne({ _id: req.params.id, role });
+  if (!user) throw ApiError.notFound(`${noun} not found`);
   if (req.user.role === ROLES.MANAGER) {
-    const ids = await contractorIdsVisibleToManager(req.user._id);
-    if (!ids.has(contractor._id.toString())) throw ApiError.forbidden();
+    const ids = await userIdsVisibleToManager(req.user._id, role);
+    if (!ids.has(user._id.toString())) throw ApiError.forbidden();
   }
-  return contractor;
+  return user;
+}
+
+// List users of a role, scoped to those a manager may see.
+async function listUsersByRole(req, role) {
+  const filter = { role };
+  if (req.user.role === ROLES.MANAGER) {
+    const ids = await userIdsVisibleToManager(req.user._id, role);
+    filter._id = { $in: [...ids] };
+  }
+  return User.find(filter).sort({ createdAt: -1 });
 }
 
 // ---- Managers (Super Admin only) ----
@@ -79,27 +87,50 @@ export const createContractor = asyncHandler(async (req, res) => {
 });
 
 export const listContractors = asyncHandler(async (req, res) => {
-  const filter = { role: ROLES.CONTRACTOR };
-  if (req.user.role === ROLES.MANAGER) {
-    const ids = await contractorIdsVisibleToManager(req.user._id);
-    filter._id = { $in: [...ids] };
-  }
-  const contractors = await User.find(filter).sort({ createdAt: -1 });
-  sendSuccess(res, contractors);
+  sendSuccess(res, await listUsersByRole(req, ROLES.CONTRACTOR));
 });
 
 export const getContractor = asyncHandler(async (req, res) => {
-  const contractor = await loadContractorScoped(req);
+  const contractor = await loadUserScoped(req, ROLES.CONTRACTOR, "Contractor");
   sendSuccess(res, contractor);
 });
 
 export const updateContractor = asyncHandler(async (req, res) => {
-  const contractor = await loadContractorScoped(req);
+  const contractor = await loadUserScoped(req, ROLES.CONTRACTOR, "Contractor");
   for (const field of ["name", "mobile", "email", "aadhaarNumber", "address"]) {
     if (field in req.body) contractor[field] = req.body[field];
   }
   await contractor.save();
   sendSuccess(res, contractor);
+});
+
+// ---- Supervisors (Super Admin + Manager, scoped) ----
+
+export const createSupervisor = asyncHandler(async (req, res) => {
+  const result = await createUserAccount({
+    role: ROLES.SUPERVISOR,
+    body: req.body,
+    creator: req.user,
+  });
+  sendCreated(res, result);
+});
+
+export const listSupervisors = asyncHandler(async (req, res) => {
+  sendSuccess(res, await listUsersByRole(req, ROLES.SUPERVISOR));
+});
+
+export const getSupervisor = asyncHandler(async (req, res) => {
+  const supervisor = await loadUserScoped(req, ROLES.SUPERVISOR, "Supervisor");
+  sendSuccess(res, supervisor);
+});
+
+export const updateSupervisor = asyncHandler(async (req, res) => {
+  const supervisor = await loadUserScoped(req, ROLES.SUPERVISOR, "Supervisor");
+  for (const field of ["name", "mobile", "email"]) {
+    if (field in req.body) supervisor[field] = req.body[field];
+  }
+  await supervisor.save();
+  sendSuccess(res, supervisor);
 });
 
 // ---- Account admin (reset password / status), scoped ----
@@ -109,8 +140,10 @@ export const resetPassword = asyncHandler(async (req, res) => {
   if (!target) throw ApiError.notFound("User not found");
   ensureNotSuperAdmin(target);
   if (req.user.role === ROLES.MANAGER) {
-    if (target.role !== ROLES.CONTRACTOR) throw ApiError.forbidden();
-    const ids = await contractorIdsVisibleToManager(req.user._id);
+    if (![ROLES.CONTRACTOR, ROLES.SUPERVISOR].includes(target.role)) {
+      throw ApiError.forbidden();
+    }
+    const ids = await userIdsVisibleToManager(req.user._id, target.role);
     if (!ids.has(target._id.toString())) throw ApiError.forbidden();
   }
 
@@ -134,8 +167,10 @@ export const updateStatus = asyncHandler(async (req, res) => {
     throw ApiError.badRequest("You cannot change your own status");
   }
   if (req.user.role === ROLES.MANAGER) {
-    if (target.role !== ROLES.CONTRACTOR) throw ApiError.forbidden();
-    const ids = await contractorIdsVisibleToManager(req.user._id);
+    if (![ROLES.CONTRACTOR, ROLES.SUPERVISOR].includes(target.role)) {
+      throw ApiError.forbidden();
+    }
+    const ids = await userIdsVisibleToManager(req.user._id, target.role);
     if (!ids.has(target._id.toString())) throw ApiError.forbidden();
   }
   target.status = req.body.status;
