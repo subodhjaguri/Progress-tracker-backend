@@ -6,6 +6,7 @@ export const createWorkOrderSchema = z.object({
   projectId: z.string().min(1, "Project is required"),
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
+  supervisor: z.string().min(1, "Supervisor is required"),
   contractor: z.string().min(1, "Contractor is required"),
   reporter: z.string().optional(),
   priority: enumOf(PRIORITY).optional(),
@@ -17,6 +18,7 @@ export const updateWorkOrderSchema = z
   .object({
     title: z.string().min(1).optional(),
     description: z.string().optional(),
+    supervisor: z.string().optional(),
     contractor: z.string().optional(),
     reporter: z.string().optional(),
     priority: enumOf(PRIORITY).optional(),

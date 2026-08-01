@@ -4,9 +4,10 @@ import { ApiError } from "../utils/ApiError.js";
 import { sendSuccess, sendCreated } from "../utils/response.js";
 import { LabourTask } from "../models/LabourTask.js";
 import { WorkOrder } from "../models/WorkOrder.js";
+import { ROLES } from "../constants/enums.js";
 import { workOrderScopeFilter } from "../services/access.js";
 
-// Read: anyone who can see the work order. Write: the assigned contractor only.
+// Read: anyone who can see the work order. Write: the assigned supervisor only.
 
 export const listLabourTasks = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
@@ -25,11 +26,11 @@ export const listLabourTasks = asyncHandler(async (req, res) => {
   sendSuccess(res, tasks);
 });
 
-async function assertAssignedContractor(req, workOrderId) {
+async function assertAssignedSupervisor(req, workOrderId) {
   const wo = await WorkOrder.findById(workOrderId);
   if (!wo) throw ApiError.notFound("Work order not found");
-  if (!wo.contractor.equals(req.user._id)) {
-    throw ApiError.forbidden("Only the assigned contractor can manage labour tasks");
+  if (!wo.supervisor.equals(req.user._id) && req.user.role !== ROLES.SUPER_ADMIN) {
+    throw ApiError.forbidden("Only the assigned supervisor can manage labour tasks");
   }
   return wo;
 }
@@ -38,7 +39,7 @@ export const createLabourTask = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     throw ApiError.badRequest("Invalid work order");
   }
-  const wo = await assertAssignedContractor(req, req.params.id);
+  const wo = await assertAssignedSupervisor(req, req.params.id);
   const b = req.body;
   const task = await LabourTask.create({
     workOrderId: wo._id,
@@ -57,7 +58,7 @@ async function loadOwnedTask(req) {
   }
   const task = await LabourTask.findById(req.params.id);
   if (!task) throw ApiError.notFound("Labour task not found");
-  await assertAssignedContractor(req, task.workOrderId);
+  await assertAssignedSupervisor(req, task.workOrderId);
   return task;
 }
 

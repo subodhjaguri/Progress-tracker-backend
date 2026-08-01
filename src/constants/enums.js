@@ -6,6 +6,7 @@ export const ROLES = {
   MANAGER: "MANAGER",
   CONTRACTOR: "CONTRACTOR",
   SUPERVISOR: "SUPERVISOR",
+  ENGINEER: "ENGINEER",
 };
 
 export const USER_STATUS = {
@@ -32,6 +33,7 @@ export const DOC_CATEGORY = [
   "Receipt",
   "Site Photo",
   "Material Document",
+  "Engineering Document",
   "Other",
 ];
 export const DOC_PARENT_TYPES = ["Project", "WorkOrder", "Contractor", "Labour"];
@@ -39,3 +41,4 @@ export const COMMENT_PARENT_TYPES = ["WorkOrder", "Project"];
 export const MATERIAL_TYPE = ["Received", "Used", "Issued"];
 export const MATERIAL_RECEIPT_STATUS = ["Pending", "Confirmed", "Issue"];
 export const LABOUR_TASK_STATUS = ["Not Started", "In Progress", "Completed"];
+export const SUBTASK_STATUS = ["Not Started", "In Progress", "Completed"];

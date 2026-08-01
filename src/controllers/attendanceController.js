@@ -6,6 +6,7 @@ import { Attendance } from "../models/Attendance.js";
 import { Labour } from "../models/Labour.js";
 import { WorkOrder } from "../models/WorkOrder.js";
 import { Project } from "../models/Project.js";
+import { ROLES } from "../constants/enums.js";
 import { attendanceScopeFilter } from "../services/access.js";
 
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
@@ -28,18 +29,18 @@ export const markAttendance = asyncHandler(async (req, res) => {
   if (!wo.projectId.equals(proj._id)) {
     throw ApiError.badRequest("Work order does not belong to the project");
   }
-  if (!wo.contractor.equals(req.user._id)) {
-    throw ApiError.forbidden("You can only mark attendance for your own work orders");
+  if (!wo.supervisor.equals(req.user._id) && req.user.role !== ROLES.SUPER_ADMIN) {
+    throw ApiError.forbidden("You can only mark attendance for work orders assigned to you");
   }
 
-  // All labour must belong to this contractor.
+  // All labour must belong to this supervisor.
   const labourIds = entries.map((e) => e.labour);
   for (const id of labourIds) {
     if (!mongoose.isValidObjectId(id)) throw ApiError.badRequest("Invalid labour id");
   }
   const owned = await Labour.find({
     _id: { $in: labourIds },
-    contractor: req.user._id,
+    supervisor: req.user._id,
   }).select("_id");
   const ownedSet = new Set(owned.map((l) => l._id.toString()));
   for (const id of labourIds) {
@@ -57,7 +58,8 @@ export const markAttendance = asyncHandler(async (req, res) => {
         $set: {
           status: e.status,
           remarks: e.remarks ?? null,
-          contractor: req.user._id,
+          supervisor: req.user._id,
+          contractor: wo.contractor ?? null,
           project: proj._id,
           workOrder: wo._id,
         },

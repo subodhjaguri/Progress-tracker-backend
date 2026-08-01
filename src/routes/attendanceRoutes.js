@@ -13,7 +13,7 @@ import {
 const router = Router();
 router.use(authenticate);
 
-router.post("/", requireRole(ROLES.CONTRACTOR), validate(markAttendanceSchema), markAttendance);
+router.post("/", requireRole(ROLES.SUPERVISOR), validate(markAttendanceSchema), markAttendance);
 router.get("/summary", attendanceSummary); // before "/" — static path
 router.get("/", listAttendance);
 

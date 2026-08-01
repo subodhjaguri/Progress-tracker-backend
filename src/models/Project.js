@@ -25,12 +25,20 @@ const projectSchema = new mongoose.Schema({
     ref: "User",
     default: null,
   },
+  // Site engineers assigned to project (role ENGINEER). Optional; multiple per project.
+  engineers: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+  ],
   image: { type: String, default: null },
 });
 
 baseSchema(projectSchema);
 projectSchema.index({ manager: 1 });
 projectSchema.index({ supervisor: 1 });
+projectSchema.index({ engineers: 1 });
 projectSchema.index({ status: 1 });
 
 // `progress` is computed from work orders (see services/rollups.js), not stored.

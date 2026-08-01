@@ -6,10 +6,15 @@ import { ATTENDANCE_STATUS } from "../constants/enums.js";
 const attendanceSchema = new mongoose.Schema({
   date: { type: Date, required: true },
   labour: { type: mongoose.Schema.Types.ObjectId, ref: "Labour", required: true },
-  contractor: {
+  supervisor: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
     required: true,
+  },
+  contractor: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null,
   },
   project: {
     type: mongoose.Schema.Types.ObjectId,
@@ -32,6 +37,7 @@ attendanceSchema.index(
   { unique: true, partialFilterExpression: { isDeleted: false } },
 );
 attendanceSchema.index({ project: 1, date: 1 });
+attendanceSchema.index({ supervisor: 1, date: 1 });
 attendanceSchema.index({ contractor: 1, date: 1 });
 
 export const Attendance = mongoose.model("Attendance", attendanceSchema);

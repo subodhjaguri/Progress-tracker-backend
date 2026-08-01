@@ -52,10 +52,24 @@ async function resolveSupervisor(body, actor) {
   return sup._id;
 }
 
+async function resolveEngineers(body) {
+  if (!("engineers" in body)) return undefined;
+  if (!Array.isArray(body.engineers)) return [];
+  const validIds = [];
+  for (const id of body.engineers) {
+    if (mongoose.isValidObjectId(id)) {
+      const eng = await User.findOne({ _id: id, role: ROLES.ENGINEER });
+      if (eng) validIds.push(eng._id);
+    }
+  }
+  return validIds;
+}
+
 export const createProject = asyncHandler(async (req, res) => {
   const b = req.body;
   const manager = await resolveManager(b, req.user);
   const supervisor = await resolveSupervisor(b, req.user);
+  const engineers = await resolveEngineers(b);
   const code = await nextCode("project");
   const project = await Project.create({
     code,
@@ -71,12 +85,14 @@ export const createProject = asyncHandler(async (req, res) => {
     status: b.status ?? "Planning",
     manager,
     supervisor: supervisor ?? null,
+    engineers: engineers ?? [],
     image: b.image ?? null,
     createdBy: req.user._id,
   });
   await project.populate([
     { path: "manager", select: MANAGER_VIEW },
     { path: "supervisor", select: MANAGER_VIEW },
+    { path: "engineers", select: MANAGER_VIEW },
   ]);
   sendCreated(res, { ...project.toJSON(), progress: 0, workOrderCount: 0 });
 });
@@ -94,6 +110,7 @@ export const listProjects = asyncHandler(async (req, res) => {
   const projects = await Project.find(filter)
     .populate("manager", MANAGER_VIEW)
     .populate("supervisor", MANAGER_VIEW)
+    .populate("engineers", MANAGER_VIEW)
     .sort({ createdAt: -1 });
   const map = await progressByProject(projects.map((p) => p._id));
   const data = projects.map((p) => {
@@ -114,7 +131,8 @@ export const getProject = asyncHandler(async (req, res) => {
     : { _id: req.params.id };
   const project = await Project.findOne(filter)
     .populate("manager", MANAGER_VIEW)
-    .populate("supervisor", MANAGER_VIEW);
+    .populate("supervisor", MANAGER_VIEW)
+    .populate("engineers", MANAGER_VIEW);
   if (!project) throw ApiError.notFound("Project not found");
 
   const summary = await projectSummary(project._id);
@@ -166,10 +184,14 @@ export const updateProject = asyncHandler(async (req, res) => {
   const supervisor = await resolveSupervisor(b, req.user);
   if (supervisor !== undefined) project.supervisor = supervisor;
 
+  const engineers = await resolveEngineers(b);
+  if (engineers !== undefined) project.engineers = engineers;
+
   await project.save();
   await project.populate([
     { path: "manager", select: MANAGER_VIEW },
     { path: "supervisor", select: MANAGER_VIEW },
+    { path: "engineers", select: MANAGER_VIEW },
   ]);
   const summary = await projectSummary(project._id);
   sendSuccess(res, { ...project.toJSON(), progress: summary.progress, summary });

@@ -3,9 +3,10 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { sendSuccess, sendCreated } from "../utils/response.js";
 import { Labour } from "../models/Labour.js";
+import { ROLES } from "../constants/enums.js";
 import { labourScopeFilter } from "../services/access.js";
 
-const CONTRACTOR_VIEW = "name mobile role";
+const SUPERVISOR_VIEW = "name mobile role";
 
 export const createLabour = asyncHandler(async (req, res) => {
   const b = req.body;
@@ -14,7 +15,8 @@ export const createLabour = asyncHandler(async (req, res) => {
     mobile: b.mobile ?? null,
     aadhaarNumber: b.aadhaarNumber ?? null,
     skill: b.skill,
-    contractor: req.user._id, // contractors create their own labour
+    supervisor: req.user._id, // supervisors create and manage their own labour
+    contractor: b.contractor ?? null,
     createdBy: req.user._id,
   });
   sendCreated(res, labour);
@@ -25,12 +27,16 @@ export const listLabour = asyncHandler(async (req, res) => {
   const scope = await labourScopeFilter(req.user);
   if (Object.keys(scope).length) ands.push(scope);
   if (req.query.skill) ands.push({ skill: req.query.skill });
+  if (req.query.supervisor && mongoose.isValidObjectId(req.query.supervisor)) {
+    ands.push({ supervisor: req.query.supervisor });
+  }
   if (req.query.contractor && mongoose.isValidObjectId(req.query.contractor)) {
     ands.push({ contractor: req.query.contractor });
   }
   const filter = ands.length ? { $and: ands } : {};
   const labour = await Labour.find(filter)
-    .populate("contractor", CONTRACTOR_VIEW)
+    .populate("supervisor", SUPERVISOR_VIEW)
+    .populate("contractor", SUPERVISOR_VIEW)
     .sort({ createdAt: -1 });
   sendSuccess(res, labour);
 });
@@ -40,17 +46,20 @@ export const getLabour = asyncHandler(async (req, res) => {
   const filter = Object.keys(scope).length
     ? { $and: [scope, { _id: req.params.id }] }
     : { _id: req.params.id };
-  const labour = await Labour.findOne(filter).populate("contractor", CONTRACTOR_VIEW);
+  const labour = await Labour.findOne(filter)
+    .populate("supervisor", SUPERVISOR_VIEW)
+    .populate("contractor", SUPERVISOR_VIEW);
   if (!labour) throw ApiError.notFound("Labour not found");
   sendSuccess(res, labour);
 });
 
-// Edits/removal restricted to the owning contractor.
+// Edits/removal restricted to the managing supervisor (or Super Admin).
 async function loadOwnLabour(req) {
-  const labour = await Labour.findOne({
-    _id: req.params.id,
-    contractor: req.user._id,
-  });
+  const filter = { _id: req.params.id };
+  if (req.user.role === ROLES.SUPERVISOR) {
+    filter.supervisor = req.user._id;
+  }
+  const labour = await Labour.findOne(filter);
   if (!labour) throw ApiError.notFound("Labour not found");
   return labour;
 }

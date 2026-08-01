@@ -11,6 +11,13 @@ const workOrderSchema = new mongoose.Schema({
   },
   title: { type: String, required: true, trim: true },
   description: { type: String, default: null },
+  // Active operational owner (Supervisor)
+  supervisor: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
+  // Passive billing/record reference (Contractor)
   contractor: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
@@ -30,6 +37,7 @@ const workOrderSchema = new mongoose.Schema({
 
 baseSchema(workOrderSchema);
 workOrderSchema.index({ projectId: 1 });
+workOrderSchema.index({ supervisor: 1 });
 workOrderSchema.index({ contractor: 1 });
 workOrderSchema.index({ status: 1 });
 workOrderSchema.index({ projectId: 1, status: 1 });

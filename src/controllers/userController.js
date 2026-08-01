@@ -133,6 +133,35 @@ export const updateSupervisor = asyncHandler(async (req, res) => {
   sendSuccess(res, supervisor);
 });
 
+// ---- Engineers (Super Admin + Manager, scoped) ----
+
+export const createEngineer = asyncHandler(async (req, res) => {
+  const result = await createUserAccount({
+    role: ROLES.ENGINEER,
+    body: req.body,
+    creator: req.user,
+  });
+  sendCreated(res, result);
+});
+
+export const listEngineers = asyncHandler(async (req, res) => {
+  sendSuccess(res, await listUsersByRole(req, ROLES.ENGINEER));
+});
+
+export const getEngineer = asyncHandler(async (req, res) => {
+  const engineer = await loadUserScoped(req, ROLES.ENGINEER, "Engineer");
+  sendSuccess(res, engineer);
+});
+
+export const updateEngineer = asyncHandler(async (req, res) => {
+  const engineer = await loadUserScoped(req, ROLES.ENGINEER, "Engineer");
+  for (const field of ["name", "mobile", "email"]) {
+    if (field in req.body) engineer[field] = req.body[field];
+  }
+  await engineer.save();
+  sendSuccess(res, engineer);
+});
+
 // ---- Account admin (reset password / status), scoped ----
 
 export const resetPassword = asyncHandler(async (req, res) => {
@@ -140,7 +169,7 @@ export const resetPassword = asyncHandler(async (req, res) => {
   if (!target) throw ApiError.notFound("User not found");
   ensureNotSuperAdmin(target);
   if (req.user.role === ROLES.MANAGER) {
-    if (![ROLES.CONTRACTOR, ROLES.SUPERVISOR].includes(target.role)) {
+    if (![ROLES.CONTRACTOR, ROLES.SUPERVISOR, ROLES.ENGINEER].includes(target.role)) {
       throw ApiError.forbidden();
     }
     const ids = await userIdsVisibleToManager(req.user._id, target.role);
@@ -167,7 +196,7 @@ export const updateStatus = asyncHandler(async (req, res) => {
     throw ApiError.badRequest("You cannot change your own status");
   }
   if (req.user.role === ROLES.MANAGER) {
-    if (![ROLES.CONTRACTOR, ROLES.SUPERVISOR].includes(target.role)) {
+    if (![ROLES.CONTRACTOR, ROLES.SUPERVISOR, ROLES.ENGINEER].includes(target.role)) {
       throw ApiError.forbidden();
     }
     const ids = await userIdsVisibleToManager(req.user._id, target.role);

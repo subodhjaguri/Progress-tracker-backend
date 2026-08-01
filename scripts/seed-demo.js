@@ -47,7 +47,7 @@ async function ensureProject({ name, manager, creator, ...fields }) {
   return Project.create({ code, name, manager, createdBy: creator, ...fields });
 }
 
-async function ensureWorkOrder({ title, project, contractor, creator, ...fields }) {
+async function ensureWorkOrder({ title, project, supervisor, contractor, creator, ...fields }) {
   const existing = await WorkOrder.findOne({ title, projectId: project });
   if (existing) return existing;
   const code = await nextCode("workOrder");
@@ -55,6 +55,7 @@ async function ensureWorkOrder({ title, project, contractor, creator, ...fields 
     code,
     projectId: project,
     title,
+    supervisor,
     contractor,
     createdBy: creator,
     ...fields,
@@ -128,6 +129,16 @@ async function run() {
     createdBy: priya.user._id,
   });
 
+  // 3c) Engineer (technical specialist) — created by Priya
+  const rajesh = await ensureUser({
+    name: "Rajesh Verma",
+    mobile: "9840000001",
+    role: ROLES.ENGINEER,
+    password: DEMO_PASSWORD,
+    email: "rajesh@example.com",
+    createdBy: priya.user._id,
+  });
+
   // 4) Projects
   const riverside = await ensureProject({
     name: "Riverside Hotel",
@@ -139,6 +150,7 @@ async function run() {
     siteLocation: "Dehradun, Uttarakhand",
     status: "In Progress",
     targetDate: new Date("2026-11-28"),
+    engineers: [rajesh.user._id],
   });
   const greenfield = await ensureProject({
     name: "Greenfield School",
@@ -148,6 +160,7 @@ async function run() {
     siteLocation: "Noida, Uttar Pradesh",
     status: "In Progress",
     targetDate: new Date("2026-07-15"),
+    engineers: [rajesh.user._id],
   });
   const northstar = await ensureProject({
     name: "Northstar Warehouse",
@@ -160,17 +173,17 @@ async function run() {
   });
 
   // 5) Work orders
-  await ensureWorkOrder({ title: "Foundation & basement", project: riverside._id, contractor: vikram._id, creator: priya.user._id, priority: "Critical", status: "In Progress", progress: 60 });
-  await ensureWorkOrder({ title: "Ground floor plumbing", project: riverside._id, contractor: salman._id, creator: priya.user._id, priority: "High", status: "Blocked", progress: 40 });
-  await ensureWorkOrder({ title: "Classroom painting", project: greenfield._id, contractor: vikram._id, creator: priya.user._id, priority: "Medium", status: "In Progress", progress: 35 });
-  await ensureWorkOrder({ title: "Structural steel erection", project: northstar._id, contractor: faizan._id, creator: arjun.user._id, priority: "Critical", status: "Blocked", progress: 30 });
+  await ensureWorkOrder({ title: "Foundation & basement", project: riverside._id, supervisor: rakesh.user._id, contractor: vikram._id, creator: priya.user._id, priority: "Critical", status: "In Progress", progress: 60 });
+  await ensureWorkOrder({ title: "Ground floor plumbing", project: riverside._id, supervisor: rakesh.user._id, contractor: salman._id, creator: priya.user._id, priority: "High", status: "Blocked", progress: 40 });
+  await ensureWorkOrder({ title: "Classroom painting", project: greenfield._id, supervisor: rakesh.user._id, contractor: vikram._id, creator: priya.user._id, priority: "Medium", status: "In Progress", progress: 35 });
+  await ensureWorkOrder({ title: "Structural steel erection", project: northstar._id, supervisor: rakesh.user._id, contractor: faizan._id, creator: arjun.user._id, priority: "Critical", status: "Blocked", progress: 30 });
 
   // 6) Labour
-  await ensureLabour({ name: "Ramesh Kumar", contractor: vikram._id, skill: "Mason", mobile: "9811100001" });
-  await ensureLabour({ name: "Sanjay Rawat", contractor: vikram._id, skill: "Helper" });
-  await ensureLabour({ name: "Mohan Lal", contractor: vikram._id, skill: "Carpenter" });
-  await ensureLabour({ name: "Imran Khan", contractor: salman._id, skill: "Welder" });
-  await ensureLabour({ name: "Vijay Pal", contractor: faizan._id, skill: "Painter" });
+  await ensureLabour({ name: "Ramesh Kumar", supervisor: rakesh.user._id, contractor: vikram._id, skill: "Mason", mobile: "9811100001" });
+  await ensureLabour({ name: "Sanjay Rawat", supervisor: rakesh.user._id, contractor: vikram._id, skill: "Helper" });
+  await ensureLabour({ name: "Mohan Lal", supervisor: rakesh.user._id, contractor: vikram._id, skill: "Carpenter" });
+  await ensureLabour({ name: "Imran Khan", supervisor: rakesh.user._id, contractor: salman._id, skill: "Welder" });
+  await ensureLabour({ name: "Vijay Pal", supervisor: rakesh.user._id, contractor: faizan._id, skill: "Painter" });
 
   // 7) Assign the supervisor to Priya's sites (idempotent)
   for (const p of [riverside, greenfield]) {

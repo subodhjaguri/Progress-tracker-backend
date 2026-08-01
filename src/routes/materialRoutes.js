@@ -5,10 +5,12 @@ import { validate } from "../middleware/validate.js";
 import { ROLES } from "../constants/enums.js";
 import {
   createMaterialSchema,
+  createBulkMaterialSchema,
   confirmMaterialSchema,
 } from "../validators/materialValidators.js";
 import {
   createMaterial,
+  createBulkMaterial,
   listMaterials,
   confirmMaterial,
 } from "../controllers/materialController.js";
@@ -23,6 +25,12 @@ router.post(
   requireRole(ROLES.SUPER_ADMIN, ROLES.MANAGER, ROLES.SUPERVISOR),
   validate(createMaterialSchema),
   createMaterial,
+);
+router.post(
+  "/bulk",
+  requireRole(ROLES.SUPER_ADMIN, ROLES.MANAGER, ROLES.SUPERVISOR),
+  validate(createBulkMaterialSchema),
+  createBulkMaterial,
 );
 router.post(
   "/:id/confirm",

@@ -18,10 +18,10 @@ import {
 const router = Router();
 router.use(authenticate);
 
-router.post("/", requireRole(ROLES.CONTRACTOR), validate(createLabourSchema), createLabour);
+router.post("/", requireRole(ROLES.SUPERVISOR), validate(createLabourSchema), createLabour);
 router.get("/", listLabour); // all roles, scoped
 router.get("/:id", getLabour); // all roles, scoped
-router.put("/:id", requireRole(ROLES.CONTRACTOR), validate(updateLabourSchema), updateLabour);
-router.delete("/:id", requireRole(ROLES.CONTRACTOR), deleteLabour);
+router.put("/:id", requireRole(ROLES.SUPERVISOR), validate(updateLabourSchema), updateLabour);
+router.delete("/:id", requireRole(ROLES.SUPERVISOR), deleteLabour);
 
 export default router;

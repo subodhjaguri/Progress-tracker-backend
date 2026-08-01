@@ -11,7 +11,17 @@ import { workOrderScopeFilter } from "../services/access.js";
 
 const USER_VIEW = "name mobile role";
 
+async function validateSupervisor(id) {
+  if (!mongoose.isValidObjectId(id)) {
+    throw ApiError.badRequest("Valid supervisor is required");
+  }
+  const s = await User.findOne({ _id: id, role: ROLES.SUPERVISOR });
+  if (!s) throw ApiError.badRequest("Supervisor not found");
+  return s._id;
+}
+
 async function validateContractor(id) {
+  if (!id) return null;
   if (!mongoose.isValidObjectId(id)) {
     throw ApiError.badRequest("Valid contractor is required");
   }
@@ -31,6 +41,7 @@ async function validateReporter(id) {
 async function populateWorkOrder(wo) {
   return wo.populate([
     { path: "projectId", select: "name code" },
+    { path: "supervisor", select: USER_VIEW },
     { path: "contractor", select: USER_VIEW },
   ]);
 }
@@ -46,6 +57,7 @@ export const createWorkOrder = asyncHandler(async (req, res) => {
     throw ApiError.forbidden("You can only add work orders to your own projects");
   }
 
+  const supervisor = await validateSupervisor(b.supervisor);
   const contractor = await validateContractor(b.contractor);
   const reporter = await validateReporter(b.reporter);
   const code = await nextCode("workOrder");
@@ -54,6 +66,7 @@ export const createWorkOrder = asyncHandler(async (req, res) => {
     projectId: project._id,
     title: b.title,
     description: b.description ?? null,
+    supervisor,
     contractor,
     reporter,
     priority: b.priority ?? "Medium",
@@ -73,6 +86,9 @@ export const listWorkOrders = asyncHandler(async (req, res) => {
   if (req.query.project && mongoose.isValidObjectId(req.query.project)) {
     ands.push({ projectId: req.query.project });
   }
+  if (req.query.supervisor && mongoose.isValidObjectId(req.query.supervisor)) {
+    ands.push({ supervisor: req.query.supervisor });
+  }
   if (req.query.contractor && mongoose.isValidObjectId(req.query.contractor)) {
     ands.push({ contractor: req.query.contractor });
   }
@@ -82,6 +98,7 @@ export const listWorkOrders = asyncHandler(async (req, res) => {
 
   const orders = await WorkOrder.find(filter)
     .populate("projectId", "name code")
+    .populate("supervisor", USER_VIEW)
     .populate("contractor", USER_VIEW)
     .sort({ createdAt: -1 });
   sendSuccess(res, orders);
@@ -94,6 +111,7 @@ export const getWorkOrder = asyncHandler(async (req, res) => {
     : { _id: req.params.id };
   const wo = await WorkOrder.findOne(filter)
     .populate("projectId", "name code")
+    .populate("supervisor", USER_VIEW)
     .populate("contractor", USER_VIEW)
     .populate("reporter", "name role");
   if (!wo) throw ApiError.notFound("Work order not found");
@@ -112,6 +130,7 @@ export const updateWorkOrder = asyncHandler(async (req, res) => {
   for (const f of ["title", "description", "priority", "dueDate", "status", "progress"]) {
     if (f in b) wo[f] = b[f];
   }
+  if ("supervisor" in b) wo.supervisor = await validateSupervisor(b.supervisor);
   if ("contractor" in b) wo.contractor = await validateContractor(b.contractor);
   if ("reporter" in b) wo.reporter = await validateReporter(b.reporter);
   if ("status" in b || "progress" in b) wo.lastUpdateAt = new Date();

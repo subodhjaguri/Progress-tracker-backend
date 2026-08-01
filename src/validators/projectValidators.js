@@ -18,6 +18,7 @@ const fields = {
   status: enumOf(PROJECT_STATUS).optional(),
   manager: z.string().optional(), // required for Super Admin; resolved in controller
   supervisor: z.string().nullable().optional(), // site material custodian; "" / null clears
+  engineers: z.array(z.string()).optional(), // assigned site engineers
   image: z.string().optional(),
 };
 

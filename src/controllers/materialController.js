@@ -112,3 +112,38 @@ export const listMaterials = asyncHandler(async (req, res) => {
     .sort({ date: -1 });
   sendSuccess(res, materials);
 });
+
+// POST /materials/bulk — create multiple material entries sharing date/project/type/party.
+export const createBulkMaterial = asyncHandler(async (req, res) => {
+  const b = req.body;
+  if (!mongoose.isValidObjectId(b.project)) {
+    throw ApiError.badRequest("Invalid project");
+  }
+  const project = await Project.findById(b.project);
+  if (!project) throw ApiError.badRequest("Project not found");
+
+  assertCanRecord(req.user.role, b.type);
+  assertProjectScope(req.user, project);
+
+  const created = [];
+  for (const item of b.items) {
+    const material = await Material.create({
+      date: b.date,
+      project: project._id,
+      materialName: item.materialName,
+      quantity: item.quantity,
+      unit: item.unit,
+      type: b.type,
+      party: b.party ?? null,
+      contractor: null,
+      note: item.note ?? null,
+      receiptStatus: b.type === "Received" ? "Pending" : null,
+      createdBy: req.user._id,
+    });
+    created.push(material);
+  }
+
+  // Populate project on all created entries
+  await Promise.all(created.map((m) => m.populate("project", "name code")));
+  sendCreated(res, created);
+});
