@@ -50,23 +50,33 @@ export const markAttendance = asyncHandler(async (req, res) => {
   }
 
   const day = dayStart(date);
+
+  // Once marked, attendance cannot be updated. Check for pre-existing records.
+  const existing = await Attendance.find({
+    labour: { $in: labourIds },
+    date: day,
+    isDeleted: { $ne: true },
+  }).select("labour");
+
+  if (existing.length > 0) {
+    throw ApiError.badRequest(
+      "Attendance has already been marked for this date and cannot be updated."
+    );
+  }
+
   const records = [];
   for (const e of entries) {
-    const doc = await Attendance.findOneAndUpdate(
-      { labour: e.labour, date: day },
-      {
-        $set: {
-          status: e.status,
-          remarks: e.remarks ?? null,
-          supervisor: req.user._id,
-          contractor: wo.contractor ?? null,
-          project: proj._id,
-          workOrder: wo._id,
-        },
-        $setOnInsert: { createdBy: req.user._id },
-      },
-      { new: true, upsert: true, setDefaultsOnInsert: true },
-    );
+    const doc = await Attendance.create({
+      labour: e.labour,
+      date: day,
+      status: e.status,
+      remarks: e.remarks ?? null,
+      supervisor: req.user._id,
+      contractor: wo.contractor ?? null,
+      project: proj._id,
+      workOrder: wo._id,
+      createdBy: req.user._id,
+    });
     records.push(doc);
   }
   sendSuccess(res, { count: records.length, records });
