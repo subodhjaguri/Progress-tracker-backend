@@ -24,7 +24,7 @@ const attendanceSchema = new mongoose.Schema({
   workOrder: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "WorkOrder",
-    required: true,
+    default: null,
   },
   status: { type: String, enum: ATTENDANCE_STATUS, required: true },
   remarks: { type: String, default: null },

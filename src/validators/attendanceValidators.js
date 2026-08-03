@@ -5,7 +5,7 @@ import { ATTENDANCE_STATUS } from "../constants/enums.js";
 export const markAttendanceSchema = z.object({
   date: z.coerce.date(),
   project: z.string().min(1, "Project is required"),
-  workOrder: z.string().min(1, "Work order is required"),
+  workOrder: z.string().optional().nullable(),
   entries: z
     .array(
       z.object({

@@ -12,10 +12,17 @@ export async function managerProjectIds(managerId) {
   return projects.map((p) => p._id);
 }
 
-/** Project _ids where the given user is the assigned supervisor. */
+/** Project _ids where the given user is the assigned supervisor or work order supervisor. */
 export async function supervisorProjectIds(supervisorId) {
-  const projects = await Project.find({ supervisor: supervisorId }).select("_id");
-  return projects.map((p) => p._id);
+  const [projects, wos] = await Promise.all([
+    Project.find({ supervisor: supervisorId }).select("_id"),
+    WorkOrder.find({ supervisor: supervisorId }).select("projectId"),
+  ]);
+  const ids = new Set(projects.map((p) => p._id.toString()));
+  for (const wo of wos) {
+    if (wo.projectId) ids.add(wo.projectId.toString());
+  }
+  return [...ids].map(oid);
 }
 
 /**

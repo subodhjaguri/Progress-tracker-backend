@@ -19,18 +19,33 @@ function dayStart(d) {
 
 export const markAttendance = asyncHandler(async (req, res) => {
   const { date, project, workOrder, entries } = req.body;
-  if (!mongoose.isValidObjectId(project) || !mongoose.isValidObjectId(workOrder)) {
-    throw ApiError.badRequest("Invalid project or work order");
+  if (!mongoose.isValidObjectId(project)) {
+    throw ApiError.badRequest("Invalid project id");
   }
   const proj = await Project.findById(project);
   if (!proj) throw ApiError.badRequest("Project not found");
-  const wo = await WorkOrder.findById(workOrder);
-  if (!wo) throw ApiError.badRequest("Work order not found");
-  if (!wo.projectId.equals(proj._id)) {
-    throw ApiError.badRequest("Work order does not belong to the project");
+
+  if (req.user.role !== ROLES.SUPER_ADMIN) {
+    const isDirectSupervisor = proj.supervisor && proj.supervisor.equals(req.user._id);
+    const hasWorkOrderInProj = await WorkOrder.exists({
+      projectId: proj._id,
+      supervisor: req.user._id,
+    });
+    if (!isDirectSupervisor && !hasWorkOrderInProj) {
+      throw ApiError.forbidden("You can only mark attendance for projects assigned to you");
+    }
   }
-  if (!wo.supervisor.equals(req.user._id) && req.user.role !== ROLES.SUPER_ADMIN) {
-    throw ApiError.forbidden("You can only mark attendance for work orders assigned to you");
+
+  let wo = null;
+  if (workOrder) {
+    if (!mongoose.isValidObjectId(workOrder)) {
+      throw ApiError.badRequest("Invalid work order id");
+    }
+    wo = await WorkOrder.findById(workOrder);
+    if (!wo) throw ApiError.badRequest("Work order not found");
+    if (!wo.projectId.equals(proj._id)) {
+      throw ApiError.badRequest("Work order does not belong to the project");
+    }
   }
 
   // All labour must belong to this supervisor.
@@ -72,9 +87,9 @@ export const markAttendance = asyncHandler(async (req, res) => {
       status: e.status,
       remarks: e.remarks ?? null,
       supervisor: req.user._id,
-      contractor: wo.contractor ?? null,
+      contractor: wo?.contractor ?? null,
       project: proj._id,
-      workOrder: wo._id,
+      workOrder: wo ? wo._id : null,
       createdBy: req.user._id,
     });
     records.push(doc);
