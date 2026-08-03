@@ -32,6 +32,7 @@ const workOrderSchema = new mongoose.Schema({
   dueDate: { type: Date, default: null },
   status: { type: String, enum: WORK_ORDER_STATUS, default: "Not Started" },
   progress: { type: Number, default: 0, min: 0, max: 100 },
+  weightagePercentage: { type: Number, default: 0, min: 0, max: 100 },
   lastUpdateAt: { type: Date, default: null },
 });
 

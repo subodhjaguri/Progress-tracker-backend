@@ -98,15 +98,74 @@ export const uploadDocument = asyncHandler(async (req, res) => {
 });
 
 export const listDocuments = asyncHandler(async (req, res) => {
-  const { parentType, parentId } = req.query;
+  const { parentType, parentId, category } = req.query;
   if (!parentType || !parentId) {
     throw ApiError.badRequest("parentType and parentId are required");
   }
   await assertParentAccessible(req.user, parentType, parentId);
-  const docs = await Document.find({ parentType, parentId })
+
+  const query = { parentType, parentId };
+  if (category) query.category = category;
+
+  // Supervisor access rule: Supervisors only see Engineering/Technical documents that are fully approved by both Super Admin and Manager
+  if (req.user.role === ROLES.SUPERVISOR) {
+    if (category === "Drawing" || category === "Engineering Document") {
+      query["superAdminApproval.status"] = "Approved";
+      query["managerApproval.status"] = "Approved";
+    }
+  }
+
+  const docs = await Document.find(query)
     .populate("uploadedBy", "name role")
+    .populate("superAdminApproval.approvedBy", "name role")
+    .populate("managerApproval.approvedBy", "name role")
     .sort({ createdAt: -1 });
   sendSuccess(res, docs);
+});
+
+export const approveSuperAdminDocument = asyncHandler(async (req, res) => {
+  const doc = await Document.findById(req.params.id);
+  if (!doc) throw ApiError.notFound("Document not found");
+
+  if (req.user.role !== ROLES.SUPER_ADMIN) {
+    throw ApiError.forbidden("Only Super Admin can approve at this stage");
+  }
+
+  doc.superAdminApproval = {
+    status: req.body.status || "Approved",
+    approvedBy: req.user._id,
+    approvedAt: new Date(),
+    note: req.body.note ?? null,
+  };
+  await doc.save();
+  await doc.populate([
+    { path: "uploadedBy", select: "name role" },
+    { path: "superAdminApproval.approvedBy", select: "name role" },
+  ]);
+  sendSuccess(res, doc);
+});
+
+export const approveManagerDocument = asyncHandler(async (req, res) => {
+  const doc = await Document.findById(req.params.id);
+  if (!doc) throw ApiError.notFound("Document not found");
+
+  if (req.user.role !== ROLES.MANAGER && req.user.role !== ROLES.SUPER_ADMIN) {
+    throw ApiError.forbidden("Only Manager can perform this approval");
+  }
+
+  doc.managerApproval = {
+    status: req.body.status || "Approved",
+    approvedBy: req.user._id,
+    approvedAt: new Date(),
+    note: req.body.note ?? null,
+  };
+  await doc.save();
+  await doc.populate([
+    { path: "uploadedBy", select: "name role" },
+    { path: "superAdminApproval.approvedBy", select: "name role" },
+    { path: "managerApproval.approvedBy", select: "name role" },
+  ]);
+  sendSuccess(res, doc);
 });
 
 export const downloadDocument = asyncHandler(async (req, res) => {
@@ -138,6 +197,7 @@ export const deleteDocument = asyncHandler(async (req, res) => {
 
   doc.isDeleted = true;
   doc.deletedAt = new Date();
+  await doc.save();
   await doc.save();
   sendSuccess(res, { message: "Document removed" });
 });

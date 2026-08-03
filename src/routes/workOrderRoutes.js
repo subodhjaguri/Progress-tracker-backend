@@ -23,16 +23,6 @@ import {
   listProgressUpdates,
   createProgressUpdate,
 } from "../controllers/progressUpdateController.js";
-import {
-  createSubTaskSchema,
-  updateSubTaskSchema,
-} from "../validators/subTaskValidators.js";
-import {
-  listSubTasks,
-  createSubTask,
-  updateSubTask,
-  deleteSubTask,
-} from "../controllers/subTaskController.js";
 
 const router = Router();
 router.use(authenticate);
@@ -43,12 +33,6 @@ router.post("/", requireRole(...editors), validate(createWorkOrderSchema), creat
 router.get("/", listWorkOrders); // all roles, scoped
 router.get("/:id", getWorkOrder); // all roles, scoped
 router.put("/:id", requireRole(...editors), validate(updateWorkOrderSchema), updateWorkOrder);
-
-// Nested subtasks (Jira-style checklist / percentage breakdown)
-router.get("/:id/subtasks", listSubTasks);
-router.post("/:id/subtasks", validate(createSubTaskSchema), createSubTask);
-router.put("/:id/subtasks/:subId", validate(updateSubTaskSchema), updateSubTask);
-router.delete("/:id/subtasks/:subId", deleteSubTask);
 
 // Nested labour tasks (read: anyone who can see the WO; create: assigned supervisor)
 router.get("/:id/labour-tasks", listLabourTasks);

@@ -12,6 +12,7 @@ export const createWorkOrderSchema = z.object({
   priority: enumOf(PRIORITY).optional(),
   dueDate: z.coerce.date().optional(),
   status: enumOf(WORK_ORDER_STATUS).optional(),
+  weightagePercentage: z.coerce.number().min(0).max(100).optional(),
 });
 
 export const updateWorkOrderSchema = z
@@ -25,6 +26,7 @@ export const updateWorkOrderSchema = z
     dueDate: z.coerce.date().optional(),
     status: enumOf(WORK_ORDER_STATUS).optional(),
     progress: z.coerce.number().min(0).max(100).optional(),
+    weightagePercentage: z.coerce.number().min(0).max(100).optional(),
   })
   .refine((d) => Object.keys(d).length > 0, {
     message: "Provide at least one field to update",

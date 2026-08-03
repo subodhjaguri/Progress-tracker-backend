@@ -24,6 +24,30 @@ const materialSchema = new mongoose.Schema({
   },
   note: { type: String, default: null },
 
+  // Material Request & Delivery Lifecycle: Requested -> Provided -> Acknowledged
+  status: {
+    type: String,
+    enum: ["Requested", "Provided", "Acknowledged", "Used", "Issued"],
+    default: "Used",
+  },
+  requestedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null,
+  },
+  providedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null,
+  },
+  acknowledgedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null,
+  },
+  providedAt: { type: Date, default: null },
+  acknowledgedAt: { type: Date, default: null },
+
   // Receipt confirmation — set on `Received` entries only (null otherwise).
   receiptStatus: { type: String, enum: MATERIAL_RECEIPT_STATUS, default: null },
   confirmedBy: {

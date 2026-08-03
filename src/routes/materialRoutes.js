@@ -13,6 +13,9 @@ import {
   createBulkMaterial,
   listMaterials,
   confirmMaterial,
+  requestMaterial,
+  provideMaterial,
+  acknowledgeMaterial,
 } from "../controllers/materialController.js";
 
 const router = Router();
@@ -31,6 +34,21 @@ router.post(
   requireRole(ROLES.SUPER_ADMIN, ROLES.MANAGER, ROLES.SUPERVISOR),
   validate(createBulkMaterialSchema),
   createBulkMaterial,
+);
+router.post(
+  "/request",
+  requireRole(ROLES.SUPER_ADMIN, ROLES.SUPERVISOR, ROLES.MANAGER),
+  requestMaterial,
+);
+router.patch(
+  "/:id/provide",
+  requireRole(ROLES.SUPER_ADMIN, ROLES.MANAGER),
+  provideMaterial,
+);
+router.patch(
+  "/:id/acknowledge",
+  requireRole(ROLES.SUPER_ADMIN, ROLES.SUPERVISOR),
+  acknowledgeMaterial,
 );
 router.post(
   "/:id/confirm",

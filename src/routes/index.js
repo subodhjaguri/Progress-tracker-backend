@@ -16,6 +16,7 @@ import commentRoutes from "./commentRoutes.js";
 import documentRoutes from "./documentRoutes.js";
 import dashboardRoutes from "./dashboardRoutes.js";
 import searchRoutes from "./searchRoutes.js";
+import paymentRoutes from "./paymentRoutes.js";
 
 const router = Router();
 
@@ -36,6 +37,7 @@ router.use("/labour", labourRoutes);
 router.use("/labour-tasks", labourTaskRoutes);
 router.use("/attendance", attendanceRoutes);
 router.use("/materials", materialRoutes);
+router.use("/payments", paymentRoutes);
 router.use("/comments", commentRoutes);
 router.use("/documents", documentRoutes);
 router.use("/dashboard", dashboardRoutes);

@@ -147,3 +147,66 @@ export const createBulkMaterial = asyncHandler(async (req, res) => {
   await Promise.all(created.map((m) => m.populate("project", "name code")));
   sendCreated(res, created);
 });
+
+// POST /materials/request — Supervisor requests material
+export const requestMaterial = asyncHandler(async (req, res) => {
+  const { date, project, materialName, quantity, unit, note } = req.body;
+  if (!mongoose.isValidObjectId(project)) {
+    throw ApiError.badRequest("Invalid project id");
+  }
+  const proj = await Project.findById(project);
+  if (!proj) throw ApiError.badRequest("Project not found");
+
+  const doc = await Material.create({
+    date: date || new Date(),
+    project: proj._id,
+    materialName,
+    quantity,
+    unit,
+    type: "Requested",
+    status: "Requested",
+    note: note ?? null,
+    requestedBy: req.user._id,
+    createdBy: req.user._id,
+  });
+  await doc.populate([
+    { path: "project", select: "name code" },
+    { path: "requestedBy", select: "name role" },
+  ]);
+  sendCreated(res, doc);
+});
+
+// PATCH /materials/:id/provide — Manager fulfills/provides requested material
+export const provideMaterial = asyncHandler(async (req, res) => {
+  const mat = await Material.findById(req.params.id);
+  if (!mat) throw ApiError.notFound("Material request not found");
+
+  mat.status = "Provided";
+  mat.providedBy = req.user._id;
+  mat.providedAt = new Date();
+  await mat.save();
+  await mat.populate([
+    { path: "project", select: "name code" },
+    { path: "requestedBy", select: "name role" },
+    { path: "providedBy", select: "name role" },
+  ]);
+  sendSuccess(res, mat);
+});
+
+// PATCH /materials/:id/acknowledge — Supervisor confirms delivery on site
+export const acknowledgeMaterial = asyncHandler(async (req, res) => {
+  const mat = await Material.findById(req.params.id);
+  if (!mat) throw ApiError.notFound("Material request not found");
+
+  mat.status = "Acknowledged";
+  mat.acknowledgedBy = req.user._id;
+  mat.acknowledgedAt = new Date();
+  await mat.save();
+  await mat.populate([
+    { path: "project", select: "name code" },
+    { path: "requestedBy", select: "name role" },
+    { path: "providedBy", select: "name role" },
+    { path: "acknowledgedBy", select: "name role" },
+  ]);
+  sendSuccess(res, mat);
+});

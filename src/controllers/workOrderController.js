@@ -73,6 +73,7 @@ export const createWorkOrder = asyncHandler(async (req, res) => {
     dueDate: b.dueDate ?? null,
     status: b.status ?? "Not Started",
     progress: 0,
+    weightagePercentage: b.weightagePercentage ?? 0,
     createdBy: req.user._id,
   });
   await populateWorkOrder(wo);
@@ -127,7 +128,7 @@ export const updateWorkOrder = asyncHandler(async (req, res) => {
   if (!wo) throw ApiError.notFound("Work order not found");
 
   const b = req.body;
-  for (const f of ["title", "description", "priority", "dueDate", "status", "progress"]) {
+  for (const f of ["title", "description", "priority", "dueDate", "status", "progress", "weightagePercentage"]) {
     if (f in b) wo[f] = b[f];
   }
   if ("supervisor" in b) wo.supervisor = await validateSupervisor(b.supervisor);

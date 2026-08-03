@@ -19,6 +19,20 @@ const documentSchema = new mongoose.Schema({
   storageKey: { type: String, required: true }, // internal — scrubbed from responses
   isSensitive: { type: Boolean, default: false },
   uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+
+  // 2-Stage Approval Pipeline for Engineering / Technical Documents
+  superAdminApproval: {
+    status: { type: String, enum: ["Pending", "Approved", "Rejected"], default: "Pending" },
+    approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    approvedAt: { type: Date, default: null },
+    note: { type: String, default: null },
+  },
+  managerApproval: {
+    status: { type: String, enum: ["Pending", "Approved", "Rejected"], default: "Pending" },
+    approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    approvedAt: { type: Date, default: null },
+    note: { type: String, default: null },
+  },
 });
 
 baseSchema(documentSchema, {

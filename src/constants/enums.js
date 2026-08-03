@@ -38,7 +38,7 @@ export const DOC_CATEGORY = [
 ];
 export const DOC_PARENT_TYPES = ["Project", "WorkOrder", "Contractor", "Labour"];
 export const COMMENT_PARENT_TYPES = ["WorkOrder", "Project"];
-export const MATERIAL_TYPE = ["Received", "Used", "Issued"];
+export const MATERIAL_TYPE = ["Received", "Used", "Issued", "Requested", "Provided", "Acknowledged"];
+export const MATERIAL_STATUS = ["Requested", "Provided", "Acknowledged", "Used", "Issued"];
 export const MATERIAL_RECEIPT_STATUS = ["Pending", "Confirmed", "Issue"];
 export const LABOUR_TASK_STATUS = ["Not Started", "In Progress", "Completed"];
-export const SUBTASK_STATUS = ["Not Started", "In Progress", "Completed"];
