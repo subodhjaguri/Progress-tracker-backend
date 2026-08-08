@@ -44,6 +44,8 @@ export const dailyReport = asyncHandler(async (req, res) => {
     }),
     ProgressUpdate.find({ projectId, date: { $gte: start, $lt: end } })
       .populate("author", "name role")
+      // Lets the daily report link each remark back to the task it came from.
+      .populate("workOrderId", "title code")
       .sort({ date: -1 }),
   ]);
   const materialsReceived = materials.filter((m) => m.type === "Received");

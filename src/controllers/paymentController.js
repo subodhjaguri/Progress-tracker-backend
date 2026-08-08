@@ -5,7 +5,11 @@ import { sendSuccess, sendCreated } from "../utils/response.js";
 import { Payment } from "../models/Payment.js";
 import { Project } from "../models/Project.js";
 import { ROLES } from "../constants/enums.js";
-import { visibleProjectIds } from "../services/access.js";
+import {
+  visibleProjectIds,
+  assertProjectScope,
+  assertProjectScopeById,
+} from "../services/access.js";
 
 export const createPayment = asyncHandler(async (req, res) => {
   const { project, type, amount, date, contractor, labourCount, proofNotes, attachment } = req.body;
@@ -14,6 +18,8 @@ export const createPayment = asyncHandler(async (req, res) => {
   }
   const proj = await Project.findById(project);
   if (!proj) throw ApiError.badRequest("Project not found");
+  // The project dropdown is client-side only — the id still has to be checked here.
+  assertProjectScope(req.user, proj);
 
   // Role permissions:
   // - Supervisor can only create "Labour" type payment requests.
@@ -22,12 +28,10 @@ export const createPayment = asyncHandler(async (req, res) => {
     throw ApiError.forbidden("Supervisors can only request Labour payments");
   }
 
-  // Managers/Super Admin created Contractor or Miscellaneous payments default to "Paid" or "Approved",
-  // whereas Labour payment requests default to "Requested".
-  let defaultStatus = "Requested";
-  if ((type === "Contractor" || type === "Miscellaneous") && req.user.role !== ROLES.SUPERVISOR) {
-    defaultStatus = "Paid";
-  }
+  // Supervisors raise requests for a manager to settle; a manager (or admin)
+  // creating an entry is recording a payment they have already made, so it lands
+  // as Paid regardless of type — no self-request/self-approve round trip.
+  const defaultStatus = req.user.role === ROLES.SUPERVISOR ? "Requested" : "Paid";
 
   const doc = await Payment.create({
     project: proj._id,
@@ -93,6 +97,8 @@ export const updatePaymentStatus = asyncHandler(async (req, res) => {
     throw ApiError.forbidden("Only managers and admins can update payment status");
   }
 
+  await assertProjectScopeById(req.user, payment.project);
+
   payment.status = req.body.status;
   if (req.body.status === "Approved" || req.body.status === "Paid") {
     payment.approvedBy = req.user._id;
@@ -100,6 +106,8 @@ export const updatePaymentStatus = asyncHandler(async (req, res) => {
   if (req.body.note) {
     payment.proofNotes = (payment.proofNotes ? `${payment.proofNotes} | Note: ` : "") + req.body.note;
   }
+  // The receipt is attached here, when the manager actually settles the payment.
+  if (req.body.attachment) payment.attachment = req.body.attachment;
 
   await payment.save();
   await payment.populate([

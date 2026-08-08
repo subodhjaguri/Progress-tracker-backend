@@ -4,6 +4,11 @@ import { ApiError } from "../utils/ApiError.js";
 import { sendSuccess, sendCreated } from "../utils/response.js";
 import { EngineeringNote } from "../models/EngineeringNote.js";
 import { Project } from "../models/Project.js";
+import {
+  visibleProjectIds,
+  assertProjectScope,
+  assertProjectScopeById,
+} from "../services/access.js";
 
 export const createEngineeringNote = asyncHandler(async (req, res) => {
   const { project, title, category, content, attachments } = req.body;
@@ -12,6 +17,7 @@ export const createEngineeringNote = asyncHandler(async (req, res) => {
   }
   const proj = await Project.findById(project);
   if (!proj) throw ApiError.badRequest("Project not found");
+  assertProjectScope(req.user, proj);
 
   const note = await EngineeringNote.create({
     project: proj._id,
@@ -31,10 +37,15 @@ export const createEngineeringNote = asyncHandler(async (req, res) => {
 });
 
 export const listEngineeringNotes = asyncHandler(async (req, res) => {
-  const filter = {};
+  const ands = [];
+  // `?project=` is a client-supplied filter, not a permission — intersect it with
+  // the projects this user may actually see.
+  const ids = await visibleProjectIds(req.user);
+  if (ids !== null) ands.push({ project: { $in: ids } });
   if (req.query.project && mongoose.isValidObjectId(req.query.project)) {
-    filter.project = req.query.project;
+    ands.push({ project: req.query.project });
   }
+  const filter = ands.length ? { $and: ands } : {};
 
   const notes = await EngineeringNote.find(filter)
     .populate("project", "name code")
@@ -48,6 +59,12 @@ export const deleteEngineeringNote = asyncHandler(async (req, res) => {
   const note = await EngineeringNote.findById(req.params.id);
   if (!note) throw ApiError.notFound("Engineering note not found");
 
-  await note.deleteOne();
+  await assertProjectScopeById(req.user, note.project);
+
+  // Soft delete, matching every other resource (document/labour/labour task).
+  note.isDeleted = true;
+  note.deletedAt = new Date();
+  await note.save();
+
   sendSuccess(res, { id: req.params.id });
 });

@@ -5,7 +5,11 @@ import { sendSuccess, sendCreated } from "../utils/response.js";
 import { Material } from "../models/Material.js";
 import { Project } from "../models/Project.js";
 import { ROLES } from "../constants/enums.js";
-import { visibleProjectIds } from "../services/access.js";
+import {
+  visibleProjectIds,
+  assertProjectScope,
+  assertProjectScopeById,
+} from "../services/access.js";
 
 // Which role may record each movement type:
 //   Used              → Supervisor (site custodian) or Super Admin
@@ -17,16 +21,6 @@ function assertCanRecord(role, type) {
     }
   } else if (role !== ROLES.SUPER_ADMIN && role !== ROLES.MANAGER) {
     throw ApiError.forbidden("Only a manager records material deliveries");
-  }
-}
-
-// The current user must be scoped to the project for their role.
-function assertProjectScope(user, project) {
-  if (user.role === ROLES.MANAGER && !project.manager.equals(user._id)) {
-    throw ApiError.forbidden("You can only record materials for your own projects");
-  }
-  if (user.role === ROLES.SUPERVISOR && !project.supervisor?.equals(user._id)) {
-    throw ApiError.forbidden("You can only manage materials for sites you supervise");
   }
 }
 
@@ -74,9 +68,7 @@ export const confirmMaterial = asyncHandler(async (req, res) => {
   if (material.type !== "Received") {
     throw ApiError.badRequest("Only received deliveries can be confirmed");
   }
-  const project = await Project.findById(material.project);
-  if (!project) throw ApiError.notFound("Project not found");
-  assertProjectScope(req.user, project);
+  await assertProjectScopeById(req.user, material.project);
 
   material.receiptStatus = req.body.status; // "Confirmed" | "Issue"
   material.confirmedBy = req.user._id;
@@ -160,6 +152,7 @@ export const requestMaterial = asyncHandler(async (req, res) => {
   }
   const proj = await Project.findById(project);
   if (!proj) throw ApiError.badRequest("Project not found");
+  assertProjectScope(req.user, proj);
 
   if (Array.isArray(items) && items.length > 0) {
     const created = [];
@@ -212,6 +205,7 @@ export const requestMaterial = asyncHandler(async (req, res) => {
 export const provideMaterial = asyncHandler(async (req, res) => {
   const mat = await Material.findById(req.params.id);
   if (!mat) throw ApiError.notFound("Material request not found");
+  await assertProjectScopeById(req.user, mat.project);
 
   mat.status = "Provided";
   mat.providedBy = req.user._id;
@@ -229,6 +223,7 @@ export const provideMaterial = asyncHandler(async (req, res) => {
 export const acknowledgeMaterial = asyncHandler(async (req, res) => {
   const mat = await Material.findById(req.params.id);
   if (!mat) throw ApiError.notFound("Material request not found");
+  await assertProjectScopeById(req.user, mat.project);
 
   mat.status = "Acknowledged";
   mat.acknowledgedBy = req.user._id;
@@ -251,6 +246,7 @@ export const updateManagerNote = asyncHandler(async (req, res) => {
   if (req.user.role !== ROLES.SUPER_ADMIN && req.user.role !== ROLES.MANAGER) {
     throw ApiError.forbidden("Only managers can update resolution notes on flagged issues");
   }
+  await assertProjectScopeById(req.user, mat.project);
 
   mat.managerNote = req.body.note ?? null;
   await mat.save();

@@ -3,8 +3,52 @@ import { User } from "../models/User.js";
 import { Project } from "../models/Project.js";
 import { WorkOrder } from "../models/WorkOrder.js";
 import { ROLES } from "../constants/enums.js";
+import { ApiError } from "../utils/ApiError.js";
 
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
+
+/**
+ * Guard for writes against a single project: throw 403 unless this user owns it.
+ * Manager = they manage it, Supervisor = they are the site custodian, Engineer =
+ * they are assigned to it, Super Admin = anything.
+ *
+ * Lives here (not in a controller) so every controller that writes project-bound
+ * data uses the same rule — the read side has always been covered by
+ * `visibleProjectIds`, and the write side drifted apart without it.
+ */
+export function assertProjectScope(user, project) {
+  if (user.role === ROLES.SUPER_ADMIN) return;
+  if (user.role === ROLES.MANAGER) {
+    if (!project.manager?.equals(user._id)) {
+      throw ApiError.forbidden("You can only act on projects you manage");
+    }
+    return;
+  }
+  if (user.role === ROLES.SUPERVISOR) {
+    if (!project.supervisor?.equals(user._id)) {
+      throw ApiError.forbidden("You can only act on sites you supervise");
+    }
+    return;
+  }
+  if (user.role === ROLES.ENGINEER) {
+    if (!(project.engineers || []).some((id) => id.equals(user._id))) {
+      throw ApiError.forbidden("You can only act on projects you are assigned to");
+    }
+    return;
+  }
+  throw ApiError.forbidden("You do not have permission to act on this project");
+}
+
+/**
+ * Same guard when you only hold the project id — e.g. authorizing a write against
+ * a ledger entry, payment or note that was just loaded. Returns the project.
+ */
+export async function assertProjectScopeById(user, projectId) {
+  const project = await Project.findById(projectId);
+  if (!project) throw ApiError.notFound("Project not found");
+  assertProjectScope(user, project);
+  return project;
+}
 
 /** Project _ids managed by a given manager. */
 export async function managerProjectIds(managerId) {

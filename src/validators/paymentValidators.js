@@ -14,4 +14,7 @@ export const createPaymentSchema = z.object({
 export const updatePaymentStatusSchema = z.object({
   status: z.enum(["Approved", "Paid", "Rejected"]),
   note: z.string().optional(),
+  // Proof of payment is attached by the manager settling it, not by the
+  // supervisor who requested it.
+  attachment: z.string().optional(),
 });

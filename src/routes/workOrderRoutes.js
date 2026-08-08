@@ -29,10 +29,12 @@ router.get("/", listWorkOrders); // all roles, scoped
 router.get("/:id", getWorkOrder); // all roles, scoped
 router.put("/:id", requireRole(...editors), validate(updateWorkOrderSchema), updateWorkOrder);
 
-// Nested progress updates (read + post require WO visibility = who may update it)
+// Nested progress updates. Reading follows work-order visibility; posting is the
+// site supervisor's job only — managers and contractors report through them.
 router.get("/:id/progress-updates", listProgressUpdates);
 router.post(
   "/:id/progress-updates",
+  requireRole(ROLES.SUPERVISOR),
   validate(createProgressUpdateSchema),
   createProgressUpdate,
 );
