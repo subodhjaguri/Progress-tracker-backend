@@ -21,6 +21,13 @@ const engineeringNoteSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  attachments: [
+    {
+      name: { type: String, required: true },
+      url: { type: String, required: true },
+      size: { type: Number, default: 0 },
+    },
+  ],
   author: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",

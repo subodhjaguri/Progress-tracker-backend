@@ -6,7 +6,7 @@ import { EngineeringNote } from "../models/EngineeringNote.js";
 import { Project } from "../models/Project.js";
 
 export const createEngineeringNote = asyncHandler(async (req, res) => {
-  const { project, title, category, content } = req.body;
+  const { project, title, category, content, attachments } = req.body;
   if (!mongoose.isValidObjectId(project)) {
     throw ApiError.badRequest("Invalid project id");
   }
@@ -18,6 +18,7 @@ export const createEngineeringNote = asyncHandler(async (req, res) => {
     title,
     category: category || "Site Description & Summary",
     content,
+    attachments: Array.isArray(attachments) ? attachments : [],
     author: req.user._id,
   });
 

@@ -13,7 +13,7 @@ router.use(authenticate);
 
 router.post(
   "/",
-  requireRole(ROLES.SUPER_ADMIN, ROLES.MANAGER, ROLES.SUPERVISOR, ROLES.ENGINEER),
+  requireRole(ROLES.SUPER_ADMIN, ROLES.ENGINEER),
   createEngineeringNote,
 );
 
@@ -21,7 +21,7 @@ router.get("/", listEngineeringNotes);
 
 router.delete(
   "/:id",
-  requireRole(ROLES.SUPER_ADMIN, ROLES.MANAGER, ROLES.ENGINEER),
+  requireRole(ROLES.SUPER_ADMIN, ROLES.ENGINEER),
   deleteEngineeringNote,
 );
 
