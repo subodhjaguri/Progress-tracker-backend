@@ -57,6 +57,7 @@ const materialSchema = new mongoose.Schema({
   },
   confirmedAt: { type: Date, default: null },
   receiptNote: { type: String, default: null },
+  managerNote: { type: String, default: null },
 });
 
 baseSchema(materialSchema);

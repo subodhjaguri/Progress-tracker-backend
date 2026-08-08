@@ -95,6 +95,12 @@ export const listWorkOrders = asyncHandler(async (req, res) => {
   }
   if (req.query.status) ands.push({ status: req.query.status });
   if (req.query.priority) ands.push({ priority: req.query.priority });
+  if (req.query.from || req.query.to) {
+    const range = {};
+    if (req.query.from) range.$gte = new Date(req.query.from);
+    if (req.query.to) range.$lte = new Date(req.query.to);
+    ands.push({ createdAt: range });
+  }
   const filter = ands.length ? { $and: ands } : {};
 
   const orders = await WorkOrder.find(filter)

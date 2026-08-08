@@ -13,11 +13,6 @@ import {
   getWorkOrder,
   updateWorkOrder,
 } from "../controllers/workOrderController.js";
-import { createLabourTaskSchema } from "../validators/labourTaskValidators.js";
-import {
-  listLabourTasks,
-  createLabourTask,
-} from "../controllers/labourTaskController.js";
 import { createProgressUpdateSchema } from "../validators/progressUpdateValidators.js";
 import {
   listProgressUpdates,
@@ -33,15 +28,6 @@ router.post("/", requireRole(...editors), validate(createWorkOrderSchema), creat
 router.get("/", listWorkOrders); // all roles, scoped
 router.get("/:id", getWorkOrder); // all roles, scoped
 router.put("/:id", requireRole(...editors), validate(updateWorkOrderSchema), updateWorkOrder);
-
-// Nested labour tasks (read: anyone who can see the WO; create: assigned supervisor)
-router.get("/:id/labour-tasks", listLabourTasks);
-router.post(
-  "/:id/labour-tasks",
-  requireRole(ROLES.SUPERVISOR),
-  validate(createLabourTaskSchema),
-  createLabourTask,
-);
 
 // Nested progress updates (read + post require WO visibility = who may update it)
 router.get("/:id/progress-updates", listProgressUpdates);

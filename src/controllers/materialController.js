@@ -109,6 +109,10 @@ export const listMaterials = asyncHandler(async (req, res) => {
   const materials = await Material.find(filter)
     .populate("project", "name code")
     .populate("confirmedBy", "name role")
+    .populate("requestedBy", "name role")
+    .populate("providedBy", "name role")
+    .populate("acknowledgedBy", "name role")
+    .populate("createdBy", "name role")
     .sort({ date: -1 });
   sendSuccess(res, materials);
 });
@@ -148,14 +152,42 @@ export const createBulkMaterial = asyncHandler(async (req, res) => {
   sendCreated(res, created);
 });
 
-// POST /materials/request — Supervisor requests material
+// POST /materials/request — Supervisor requests material (supports single or bulk items)
 export const requestMaterial = asyncHandler(async (req, res) => {
-  const { date, project, materialName, quantity, unit, note } = req.body;
+  const { date, project, items, materialName, quantity, unit, note } = req.body;
   if (!mongoose.isValidObjectId(project)) {
     throw ApiError.badRequest("Invalid project id");
   }
   const proj = await Project.findById(project);
   if (!proj) throw ApiError.badRequest("Project not found");
+
+  if (Array.isArray(items) && items.length > 0) {
+    const created = [];
+    for (const item of items) {
+      const doc = await Material.create({
+        date: date || new Date(),
+        project: proj._id,
+        materialName: item.materialName,
+        quantity: item.quantity,
+        unit: item.unit,
+        type: "Requested",
+        status: "Requested",
+        note: item.note ?? null,
+        requestedBy: req.user._id,
+        createdBy: req.user._id,
+      });
+      created.push(doc);
+    }
+    await Promise.all(
+      created.map((m) =>
+        m.populate([
+          { path: "project", select: "name code" },
+          { path: "requestedBy", select: "name role" },
+        ])
+      )
+    );
+    return sendCreated(res, created);
+  }
 
   const doc = await Material.create({
     date: date || new Date(),
@@ -207,6 +239,25 @@ export const acknowledgeMaterial = asyncHandler(async (req, res) => {
     { path: "requestedBy", select: "name role" },
     { path: "providedBy", select: "name role" },
     { path: "acknowledgedBy", select: "name role" },
+  ]);
+  sendSuccess(res, mat);
+});
+
+// PATCH /materials/:id/manager-note — Manager/Admin adds an action or resolution note to a flagged material delivery issue
+export const updateManagerNote = asyncHandler(async (req, res) => {
+  const mat = await Material.findById(req.params.id);
+  if (!mat) throw ApiError.notFound("Material entry not found");
+
+  if (req.user.role !== ROLES.SUPER_ADMIN && req.user.role !== ROLES.MANAGER) {
+    throw ApiError.forbidden("Only managers can update resolution notes on flagged issues");
+  }
+
+  mat.managerNote = req.body.note ?? null;
+  await mat.save();
+  await mat.populate([
+    { path: "project", select: "name code" },
+    { path: "confirmedBy", select: "name role" },
+    { path: "requestedBy", select: "name role" },
   ]);
   sendSuccess(res, mat);
 });

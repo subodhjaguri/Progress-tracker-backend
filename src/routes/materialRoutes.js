@@ -16,6 +16,7 @@ import {
   requestMaterial,
   provideMaterial,
   acknowledgeMaterial,
+  updateManagerNote,
 } from "../controllers/materialController.js";
 
 const router = Router();
@@ -49,6 +50,11 @@ router.patch(
   "/:id/acknowledge",
   requireRole(ROLES.SUPER_ADMIN, ROLES.SUPERVISOR),
   acknowledgeMaterial,
+);
+router.patch(
+  "/:id/manager-note",
+  requireRole(ROLES.SUPER_ADMIN, ROLES.MANAGER),
+  updateManagerNote,
 );
 router.post(
   "/:id/confirm",
